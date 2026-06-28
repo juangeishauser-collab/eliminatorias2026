@@ -1048,6 +1048,16 @@ function showTab(name,el){
 // ═══════ INIT ═══════
 // Firebase onSnapshot en load() se encarga de todo al recibir datos
 load();
+
+// Exponer funciones al scope global (necesario por type="module")
+window.showTab = showTab;
+window.openModal = openModal;
+window.closeModal = closeModal;
+window.doLogin = doLogin;
+window.doLogout = doLogout;
+window.setPen = setPen;
+window.onAdminInput = onAdminInput;
+window.setAdminPen = setAdminPen;
 </script>
 </body>
 </html>
