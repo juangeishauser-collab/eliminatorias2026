@@ -312,7 +312,7 @@ body{background:var(--dark);color:var(--white);font-family:var(--font);min-heigh
   </div>
 </main>
 
-<script>
+<script type="module">
 // ═══════ CONFIG ═══════
 const ADMIN_PASS = '2264Qwer!';
 const PLAYERS = ['juani','lalo','crocco','maxi','peter','lauti'];
@@ -398,14 +398,47 @@ const ALL_IDS=[
   'CF1','CF2','CF3','CF4','SF1','SF2','3P','FINAL'
 ];
 
+// ═══════ FIREBASE ═══════
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-app.js";
+import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCw8A7tlT1vhbb-utdBBLaMWMOgRloWBK0",
+  authDomain: "eliminatorias-2026.firebaseapp.com",
+  projectId: "eliminatorias-2026",
+  storageBucket: "eliminatorias-2026.firebasestorage.app",
+  messagingSenderId: "162988312846",
+  appId: "1:162988312846:web:5851b197565ac9920f2f5f"
+};
+
+const fbApp = initializeApp(firebaseConfig);
+const db = getFirestore(fbApp);
+
 // ═══════ STATE ═══════
 let state={official:{},prodes:{}};
 let isAdmin=false, activePlayer=PLAYERS[0];
+let _saveTimer=null;
 
-function save(){localStorage.setItem('prode26v5',JSON.stringify(state));}
+function save(){
+  clearTimeout(_saveTimer);
+  _saveTimer=setTimeout(async()=>{
+    try{ await setDoc(doc(db,'prode','state'), JSON.parse(JSON.stringify(state))); }
+    catch(e){ console.error('Firebase save error:',e); }
+  },800);
+}
+
 function load(){
-  try{const s=localStorage.getItem('prode26v5');if(s)state=JSON.parse(s);}catch(e){}
   PLAYERS.forEach(p=>{if(!state.prodes[p])state.prodes[p]={};});
+  onSnapshot(doc(db,'prode','state'),(snap)=>{
+    if(snap.exists()){
+      const d=snap.data();
+      state.official=d.official||{};
+      state.prodes=d.prodes||{};
+      PLAYERS.forEach(p=>{if(!state.prodes[p])state.prodes[p]={};});
+    }
+    refreshAll();
+    buildBracket('bracket-root',state.official,false,'b');
+  });
 }
 
 // ═══════ LOGIC ═══════
@@ -698,22 +731,25 @@ function addConnSVG(wrap, fromN, toN, side){
   const ratio = fromN/toN;
 
   if(side==='left'){
-    // Lines go: from-card (right edge) → vertical bar (left half) → to-card (left edge)
+    // Left side: fromN > toN (e.g. 8→4, 4→2, 2→1)
+    // Each "to" slot collects (fromN/toN) "from" slots
+    // Lines: from-card LEFT edge → mid bar → to-card RIGHT edge
+    // (connector sits to the RIGHT of the from-col, to the LEFT of the to-col)
     for(let t=0;t<toN;t++){
       const f0 = t*ratio;
       const f1 = f0+ratio-1;
       const y0 = fsh*f0 + fsh/2;
       const y1 = fsh*f1 + fsh/2;
       const midY = (y0+y1)/2;
-      // Horizontal from each feeder to the mid-x bar
+      // Horizontal from left edge (from-card exits right → connector left edge) to mid-x bar
       for(let fi=f0;fi<=f1;fi++){
         const fy = fsh*fi + fsh/2;
-        addSvgPath(svg,`M ${CONN_W} ${fy} H ${CONN_W/2}`,color,sw);
+        addSvgPath(svg,`M 0 ${fy} H ${CONN_W/2}`,color,sw);
       }
       // Vertical bar joining feeders
       addSvgPath(svg,`M ${CONN_W/2} ${y0} V ${y1}`,color,sw);
-      // Horizontal to next col
-      addSvgPath(svg,`M ${CONN_W/2} ${midY} H 0`,color,sw);
+      // Horizontal from bar to right edge (enters to-card from left)
+      addSvgPath(svg,`M ${CONN_W/2} ${midY} H ${CONN_W}`,color,sw);
     }
   } else {
     // Right side: connector sits BETWEEN left col (fromN slots, smaller) and right col (toN slots, larger)
@@ -1010,8 +1046,8 @@ function showTab(name,el){
 }
 
 // ═══════ INIT ═══════
+// Firebase onSnapshot en load() se encarga de todo al recibir datos
 load();
-buildBracket('bracket-root',state.official,false,'b');
 </script>
 </body>
 </html>
